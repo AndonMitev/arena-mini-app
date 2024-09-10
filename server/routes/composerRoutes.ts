@@ -13,7 +13,7 @@ router.post('/', (req: Request, res: Response) => {
   res.json({
     type: 'form',
     title: 'Action Composer Mini App',
-    url: 'https://97ec-89-215-8-152.ngrok-free.app' // make sure this is your public URL
+    url: 'https://arena-mini-app.vercel.app' // make sure this is your public URL
   } as ComposerActionFormResponse);
 });
 
