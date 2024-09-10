@@ -16,6 +16,7 @@ import { Level } from '~/scenes/Level';
 import { GameOver } from '~/scenes/GameOver';
 import { HUD } from '~/scenes/HUD';
 import { MyColor } from '~/enums/MyColor';
+import { socketService } from './services/socketService';
 
 const addScenes = (game: Game) => {
   game.scene.add(SceneKey.Intro, Intro);
@@ -29,8 +30,27 @@ const addScenes = (game: Game) => {
 
 export class MyGame {
   game: Game;
+  private sessionId: string | null = null;
+
   constructor() {
     this.initGame();
+    this.initializeSocket();
+  }
+
+  private initializeSocket() {
+    socketService.connect();
+
+    socketService.on('sessionCreated', ({ sessionId, fid }) => {
+      this.sessionId = sessionId;
+      console.log(`Session created for game: ${sessionId} (FID: ${fid})`);
+      // You might want to do some initialization here with the FID
+    });
+
+    socketService.on('userData', (data) => {
+      const currentFid = socketService.getCurrentFid();
+      console.log(`Received user data in MyGame for FID ${currentFid}:`, data);
+      // Handle the received data in your game
+    });
   }
 
   async initGame() {
