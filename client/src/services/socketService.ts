@@ -1,6 +1,6 @@
 import io, { Socket } from 'socket.io-client';
 
-const URL = 'http://localhost:3000';
+const URL = 'https://arena-mini-app-server.vercel.app'; // server url
 
 class SocketService {
   private socket: Socket | null = null;
