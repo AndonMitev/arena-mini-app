@@ -17,15 +17,17 @@ import { GameOver } from '~/scenes/GameOver';
 import { HUD } from '~/scenes/HUD';
 import { MyColor } from '~/enums/MyColor';
 import { socketService } from './services/socketService';
+import { Preloader } from '~/scenes/Preloader';
 
 const addScenes = (game: Game) => {
+  game.scene.add(SceneKey.Preloader, Preloader);
+  game.scene.add(SceneKey.Boot, Boot);
   game.scene.add(SceneKey.Intro, Intro);
   game.scene.add(SceneKey.MainMenu, MainMenu);
   game.scene.add(SceneKey.UserInterface, UserInterface);
   game.scene.add(SceneKey.Level, Level);
   game.scene.add(SceneKey.GameOver, GameOver);
   game.scene.add(SceneKey.HUD, HUD);
-  game.scene.add(SceneKey.Boot, Boot, true);
 };
 
 export class MyGame {
@@ -38,18 +40,22 @@ export class MyGame {
   }
 
   private initializeSocket() {
+    console.log('Attempting to connect to socket');
     socketService.connect();
 
-    socketService.on('sessionCreated', ({ sessionId, fid }) => {
-      this.sessionId = sessionId;
-      console.log(`Session created for game: ${sessionId} (FID: ${fid})`);
-      // You might want to do some initialization here with the FID
+    socketService.on('connect', () => {
+      console.log('Socket connected successfully');
     });
 
-    socketService.on('userData', (data) => {
-      const currentFid = socketService.getCurrentFid();
-      console.log(`Received user data in MyGame for FID ${currentFid}:`, data);
-      // Handle the received data in your game
+    socketService.on('sessionCreated', ({ sessionId }) => {
+      this.sessionId = sessionId;
+      console.log(`Session created for game: ${sessionId}`);
+      this.game.events.emit('sessionCreated', { sessionId });
+    });
+
+    socketService.on('userData', ({ fid, data }) => {
+      console.log(`Received user data in MyGame for FID ${fid}:`, data);
+      this.game.events.emit('userData', { fid, data });
     });
   }
 
@@ -94,6 +100,7 @@ export class MyGame {
     });
     addScenes(this.game);
     setGame(this.game);
+    this.game.scene.start(SceneKey.Preloader);
     this.preventScroll();
   }
   preventScroll() {

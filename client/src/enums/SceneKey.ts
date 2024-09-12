@@ -1,10 +1,10 @@
 export enum SceneKey {
+  Preloader = 'Preloader',
+  Boot = 'Boot',
   Intro = 'Intro',
   MainMenu = 'MainMenu',
   Level = 'Level',
   UserInterface = 'UserInterface',
-  Boot = 'Boot',
-  Settings = 'Settings',
   GameOver = 'GameOver',
   HUD = 'HUD',
 }

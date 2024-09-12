@@ -1,14 +1,14 @@
-import { Server } from 'socket.io';
+import { Server, Socket } from 'socket.io';
 import { Server as HttpServer } from 'http';
 import { v4 as uuidv4 } from 'uuid';
 
-let io: Server;
-
 export const userSessions: {
-  [fid: number]: { sessionId: string; data: any; socket: any };
+  [sessionId: string]: { fid: number | null; data: any; socket: Socket };
 } = {};
 
-export function initializeSocket(server: HttpServer) {
+let io: Server;
+
+export const initializeSocket = (server: HttpServer) => {
   io = new Server(server, {
     cors: {
       origin: '*',
@@ -16,41 +16,24 @@ export function initializeSocket(server: HttpServer) {
     }
   });
 
-  io.on('connection', (socket) => {
-    console.log('A client connected');
+  io.on('connection', (socket: Socket) => {
+    const sessionId = uuidv4();
+    console.log('A user connected', socket.id, 'Session:', sessionId);
 
-    socket.on('register', (fid: number) => {
-      if (!userSessions[fid]) {
-        const sessionId = uuidv4();
-        userSessions[fid] = { sessionId, data: {}, socket };
-        console.log(`New session created for FID ${fid}: ${sessionId}`);
-      } else {
-        userSessions[fid].socket = socket;
-      }
+    userSessions[sessionId] = { fid: null, data: {}, socket };
 
-      socket.join(`user_${fid}`);
-      console.log(
-        `Client registered for FID ${fid}, SessionID: ${userSessions[fid].sessionId}`
-      );
-
-      // Send the current session data to the client
-      socket.emit('userData', {
-        sessionId: userSessions[fid].sessionId,
-        data: userSessions[fid].data
-      });
-    });
+    socket.emit('sessionCreated', { sessionId });
 
     socket.on('disconnect', () => {
-      console.log('Client disconnected');
+      console.log('User disconnected', socket.id, 'Session:', sessionId);
+      delete userSessions[sessionId];
     });
   });
+};
 
-  return io;
-}
-
-export function getIO() {
+export const getIO = () => {
   if (!io) {
     throw new Error('Socket.io not initialized!');
   }
   return io;
-}
+};

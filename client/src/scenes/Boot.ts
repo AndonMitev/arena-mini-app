@@ -1,7 +1,21 @@
 import { ProgressBar } from '~/ProgressBar';
 import { SceneKey } from '~/enums/SceneKey';
+import { farcasterService } from '~/services/farcasterService';
 
 export class Boot extends Phaser.Scene {
+  private userFid: number | null = null;
+  private userPfpUrl: string | null = null;
+
+  constructor() {
+    super(SceneKey.Boot);
+  }
+
+  init(data: { userFid: number | null; userPfpUrl: string | null }) {
+    console.log('Boot scene initialized with user data:', data);
+    this.userFid = data.userFid;
+    this.userPfpUrl = data.userPfpUrl;
+  }
+
   preload(): void {
     this.load.setPath('assets/gamedevjs2024');
     new ProgressBar(this);
@@ -9,10 +23,20 @@ export class Boot extends Phaser.Scene {
     this.loadSounds();
     this.loadFonts();
     this.preloadSpineAnimations();
+
+    // Load the user's PFP as the player sprite
+    if (this.userPfpUrl) {
+      this.load.image('player', this.userPfpUrl);
+    } else {
+      // Load a default player sprite if no PFP is available
+      this.load.image('player', 'default_player.png');
+    }
   }
 
   loadImages() {
     this.load.image('trailTexture', 'trailTexture.png');
+    // Remove or comment out the previous player image load
+    // this.load.image('player', '...');
   }
 
   loadSounds() {
@@ -73,7 +97,14 @@ export class Boot extends Phaser.Scene {
   loadFonts() {
     this.loadFont('ConcertOne', 'assets/gamedevjs2024/fonts/ConcertOne-Regular.ttf');
   }
+
   create(): void {
+    if (this.userPfpUrl) {
+      console.log('User PFP loaded as player sprite:', this.userPfpUrl);
+    } else {
+      console.log('Default player sprite loaded');
+    }
+
     this.scene.start(SceneKey.Intro);
   }
 }
