@@ -1,6 +1,5 @@
 import { ProgressBar } from '~/ProgressBar';
 import { SceneKey } from '~/enums/SceneKey';
-import { farcasterService } from '~/services/farcasterService';
 
 export class Boot extends Phaser.Scene {
   private userFid: number | null = null;
@@ -24,12 +23,12 @@ export class Boot extends Phaser.Scene {
     this.loadFonts();
     this.preloadSpineAnimations();
 
-    // Load the user's PFP as the player sprite
+    // Load the user's PFP
     if (this.userPfpUrl) {
-      this.load.image('player', this.userPfpUrl);
+      this.load.image('playerPfp', this.userPfpUrl);
     } else {
       // Load a default player sprite if no PFP is available
-      this.load.image('player', 'default_player.png');
+      this.load.image('playerPfp', 'default_player.png');
     }
   }
 
@@ -99,12 +98,7 @@ export class Boot extends Phaser.Scene {
   }
 
   create(): void {
-    if (this.userPfpUrl) {
-      console.log('User PFP loaded as player sprite:', this.userPfpUrl);
-    } else {
-      console.log('Default player sprite loaded');
-    }
-
+    console.log('Boot scene created, starting Intro scene');
     this.scene.start(SceneKey.Intro);
   }
 }

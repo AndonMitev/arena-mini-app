@@ -109,14 +109,14 @@ export class UserInput {
       this.trajectoryGraphics.moveTo(line2.from.x, line2.from.y);
       this.trajectoryGraphics.lineTo(line2.to.x, line2.to.y);
     }
-    let yScale = 1;
+
+    // Remove the scaling and rotation logic as we no longer have a spine object
+    // If you want to add some visual feedback for the throw direction, you could rotate the sprite instead:
     if (distance > 10) {
-      yScale = distance / maxDistance;
-      if (yScale < 1) yScale = 1;
-      // this.player.spineObject.setScale(1,yScale)
-      this.player.eyeGroup.rotation =
-        Phaser.Math.RadToDeg(line2.from.clone().subtract(line2.to).angle() - Math.PI / 2) * -1;
+      const angle = Phaser.Math.Angle.Between(line2.from.x, line2.from.y, line2.to.x, line2.to.y);
+      this.player.sprite.setRotation(angle + Math.PI / 2);
     }
+
     if (distance > minDistance) {
       this.trajectoryGraphics.stroke();
       this.trajectorypotentialGraphics.stroke();

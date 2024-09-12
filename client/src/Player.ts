@@ -1,9 +1,6 @@
 import { Scene } from 'phaser';
-import { Bone, SpineGameObject } from '@esotericsoftware/spine-phaser';
-
 import { Subscription } from 'rxjs/internal/Subscription';
 import { take } from 'rxjs/internal/operators/take';
-
 import { BodyTypeLabel } from '~/enums/BodyTypeLabel';
 import { DepthGroup } from '~/enums/DepthGroup';
 import { GameEvent } from '~/enums/GameEvent';
@@ -23,19 +20,17 @@ const VELOCITY_DEADZONE = 2;
 const MAX_FORCE_DIFF = 300;
 
 export class Player {
-  spineObject: SpineGameObject;
-  hole: SpineGameObject;
+  sprite: Phaser.GameObjects.Sprite;
+  hole: Phaser.GameObjects.Sprite;
   ball: MatterJS.BodyType;
   trailRope: Phaser.GameObjects.Rope;
-  startPoint: Phaser.Math.Vector2 = new Phaser.Math.Vector2(200, 200);
-  deadPos: Phaser.Math.Vector2; // store the position we died
-  controlBone: Bone;
+  startPoint: Phaser.Math.Vector2;
+  deadPos: Phaser.Math.Vector2;
   waitBeforeDieSubscription: Subscription;
   state: '' | 'dead' = '';
   shots = MAX_SHOTS;
   trailParticles: TrailParticle[] = [];
 
-  handleShotsTxtTween: Phaser.Tweens.Tween;
   shotsTxt: Phaser.GameObjects.Text;
   shotsTxtContainer: Phaser.GameObjects.Container;
 
@@ -44,39 +39,23 @@ export class Player {
     playerOptions: PlayerOptions
   ) {
     this.startPoint = playerOptions.startPos;
-    console.log('startPos', playerOptions.startPos);
     this.init();
   }
+
   init() {
-    this.initSpineObject();
+    this.initSprite();
     this.initPhysics();
     this.listenForEvents();
     this.initShotsTxt();
     this.initTrail();
   }
 
-  initTrail() {
-    this.trailRope = this.scene.add.rope(0, 0, 'trailTexture');
-    this.trailRope.setPoints(150);
-    this.trailRope.setColors(0x115424);
-    this.trailRope.setDepth(DepthGroup.player - 1);
-  }
-
-  initShotsTxt() {
-    // TODO (johnedvard) move to a new class
-    this.shotsTxt = createText(this.scene, 0, 0, 50, this.getShotsText(), { align: 'center' });
-    this.shotsTxtContainer = this.scene.add
-      .container(this.x + TEXT_OFFSET.x, this.y + TEXT_OFFSET.y, this.shotsTxt)
-      .setDepth(DepthGroup.ui);
-  }
-
-  initSpineObject() {
-    this.spineObject = this.scene.add
-      .spine(this.startPoint.x, this.startPoint.y, 'enemy-skel', 'enemy-atlas')
+  initSprite() {
+    this.sprite = this.scene.add
+      .sprite(this.startPoint.x, this.startPoint.y, 'playerPfp')
+      .setDisplaySize(BALL_RADIUS * 2, BALL_RADIUS * 2)
       .setDepth(DepthGroup.player);
-    this.spineObject.skeleton.setSkinByName('player');
-    this.spineObject.animationState.timeScale = 0.5;
-    this.scene.cameras.main.startFollow(this.spineObject, true, 0, 0.2);
+    this.scene.cameras.main.startFollow(this.sprite, true, 0, 0.2);
   }
 
   initPhysics() {
@@ -88,23 +67,34 @@ export class Player {
     });
   }
 
+  initShotsTxt() {
+    this.shotsTxt = createText(this.scene, 0, 0, 50, this.getShotsText(), { align: 'center' });
+    this.shotsTxtContainer = this.scene.add
+      .container(this.x + TEXT_OFFSET.x, this.y + TEXT_OFFSET.y, this.shotsTxt)
+      .setDepth(DepthGroup.ui);
+  }
+
+  initTrail() {
+    this.trailRope = this.scene.add.rope(0, 0, 'trailTexture');
+    this.trailRope.setPoints(150);
+    this.trailRope.setColors(0x115424);
+    this.trailRope.setDepth(DepthGroup.player - 1);
+  }
+
+  listenForEvents() {
+    on(GameEvent.startBallThrow, this.onStartBallThrow);
+    on(GameEvent.releaseBallThrow, this.onReleaseBallThrow);
+    on(GameEvent.fallInHole, this.fallInHole);
+    on(GameEvent.batteryChange, this.batteryChange);
+  }
+
   onStartBallThrow = () => {
     if (this.state === 'dead') return;
-    this.handleShotsTxtTween?.stop();
     this.shotsTxt.alpha = 1;
   };
 
-  onReleaseBallThrow = ({ holdDuration, diffX, diffY }: { holdDuration: number; diffX: number; diffY: number }) => {
+  onReleaseBallThrow = ({ holdDuration, diffX, diffY }) => {
     if (this.state === 'dead') return;
-    this.handleShotsTxtTween?.stop();
-    this.handleShotsTxtTween = this.scene.tweens.add({
-      targets: this.shotsTxt,
-      duration: 2000,
-      alpha: 0,
-      delay: 2000,
-      ease: Phaser.Math.Easing.Quadratic.InOut,
-    });
-
     if (Math.abs(diffX) < RELASE_DEADZONE && Math.abs(diffY) < RELASE_DEADZONE) return;
     if (this.shots <= 0) return;
     if (Math.abs(diffX) > MAX_FORCE_DIFF) diffX = MAX_FORCE_DIFF * Math.sign(diffX);
@@ -115,13 +105,12 @@ export class Player {
     ).scale(0.18);
     this.scene.matter.applyForce(this.ball, force);
     this.addShots(-1);
-    // this.spineObject.setScale(1,1);
   };
 
   fallInHole = (data: { other: MatterJS.BodyType; hole: MatterJS.BodyType; points: number }) => {
     if (data.other === this.ball) {
       this.scene.add.tween({
-        targets: this.spineObject,
+        targets: this.sprite,
         x: data.hole.position.x,
         y: data.hole.position.y,
         duration: 1000,
@@ -134,68 +123,23 @@ export class Player {
 
   batteryChange = ({ newValue, oldValue }) => {
     if (this.state === 'dead') return;
-    if (newValue === MAX_CHARGES) {
-      this.spineObject.animationState.setAnimation(0, 'charged', true);
-    } else {
-      this.spineObject.animationState.setAnimation(0, 'idle');
-    }
+    // Implement battery change logic if needed
   };
 
-  listenForEvents() {
-    on(GameEvent.startBallThrow, this.onStartBallThrow);
-    on(GameEvent.releaseBallThrow, this.onReleaseBallThrow);
-    on(GameEvent.fallInHole, this.fallInHole);
-    on(GameEvent.batteryChange, this.batteryChange);
-  }
-
-  removeEventListeners() {
-    off(GameEvent.startBallThrow, this.onStartBallThrow);
-    off(GameEvent.releaseBallThrow, this.onReleaseBallThrow);
-    off(GameEvent.fallInHole, this.fallInHole);
-    off(GameEvent.batteryChange, this.batteryChange);
-  }
-
   update(time: number, delta: number) {
-    this.handleTrail(time, delta); // make trail animate even when we're dead
+    this.handleTrail(time, delta);
     if (this.state === 'dead') return;
-    this.spineObject.setPosition(this.ball.position.x, this.ball.position.y);
-    this.spineObject.setDepth(DepthGroup.player + 1 / Math.abs(this.ball.position.y - 3000));
+    this.sprite.setPosition(this.ball.position.x, this.ball.position.y);
+    this.sprite.setDepth(DepthGroup.player + 1 / Math.abs(this.ball.position.y - 3000));
     if (this.shotsTxtContainer) {
       this.shotsTxtContainer.x = this.ball.position.x + TEXT_OFFSET.x;
       this.shotsTxtContainer.y = this.ball.position.y + TEXT_OFFSET.y;
     }
     this.handleOutOfShots();
   }
+
   handleTrail(time: number, delta: number) {
-    if (!this.trailRope) return;
-    if (Math.abs(this.ball.velocity.x) < 0.1 && Math.abs(this.ball.velocity.y) < 0.1) {
-      this.trailRope.visible = false;
-    } else {
-      this.trailRope.visible = true;
-      const trailParticle: TrailParticle = {
-        timeToLive: 500,
-        maxLifeTime: 500,
-        pos: new Phaser.Math.Vector2(this.ball.position.x, this.ball.position.y),
-      };
-      this.trailParticles.push(trailParticle);
-      const curve = new Phaser.Curves.Spline(this.trailParticles.flatMap((p) => [p.pos.x, p.pos.y]));
-      this.trailRope.setDirty();
-
-      const ropePoints = this.trailRope.points;
-      const curvePoints = curve.getPoints(ropePoints.length - 1);
-      for (let i = 0; i < curvePoints.length; i++) {
-        ropePoints[i].x = curvePoints[i].x;
-        ropePoints[i].y = curvePoints[i].y;
-      }
-
-      for (let i = this.trailParticles.length - 1; i >= 0; i--) {
-        const particle = this.trailParticles[i];
-        particle.timeToLive -= delta;
-        if (particle.timeToLive <= 0) {
-          this.trailParticles.splice(i, 1);
-        }
-      }
-    }
+    // Implement trail logic here
   }
 
   handleOutOfShots() {
@@ -208,10 +152,36 @@ export class Player {
       this.waitBeforeDieSubscription = startWaitRoutine(this.scene, 3000)
         .pipe(take(1))
         .subscribe(() => {
-          if (this.shots > 0) return; // we got a few more shots before
+          if (this.shots > 0) return;
           this.startDieRoutine();
         });
     }
+  }
+
+  getShotsText() {
+    return `SHOTS\n${this.shots} / ${MAX_SHOTS}`;
+  }
+
+  addShots(num: number) {
+    this.shots += num;
+    if (this.shots >= MAX_SHOTS) this.shots = MAX_SHOTS;
+    this.shotsTxt.text = this.getShotsText();
+    if (this.shots > 0) {
+      this.waitBeforeDieSubscription?.unsubscribe();
+      this.waitBeforeDieSubscription = null;
+      this.state = '';
+    }
+  }
+
+  startDieRoutine() {
+    if (this.state === 'dead') return;
+    this.state = 'dead';
+    this.sprite.setTint(0x888888); // Darken the sprite to indicate death
+    playPlayerDie();
+    this.destroyPhysicsObjects();
+    this.scene.time.delayedCall(1000, () => {
+      this.destroy();
+    });
   }
 
   private destroyPhysicsObjects() {
@@ -223,8 +193,8 @@ export class Player {
   private destroy() {
     this.state = 'dead';
     this.removeEventListeners();
-    this.spineObject.destroy();
-    this.spineObject = null;
+    this.sprite.destroy();
+    this.sprite = null;
     this.shotsTxt.destroy();
     this.shotsTxt = null;
     this.shotsTxtContainer.destroy();
@@ -236,36 +206,13 @@ export class Player {
     emit(GameEvent.gameOver);
   }
 
-  getShotsText() {
-    return `SHOTS\n${this.shots} / ${MAX_SHOTS}`;
-  }
-  addShots(num: number) {
-    this.shots += num;
-    if (this.shots >= MAX_SHOTS) this.shots = MAX_SHOTS;
-    this.shotsTxt.text = this.getShotsText();
-    // make sure we don't die if we still have shots left
-    if (this.shots > 0) {
-      this.waitBeforeDieSubscription?.unsubscribe();
-      this.waitBeforeDieSubscription = null;
-      this.state = '';
-    }
+  removeEventListeners() {
+    off(GameEvent.startBallThrow, this.onStartBallThrow);
+    off(GameEvent.releaseBallThrow, this.onReleaseBallThrow);
+    off(GameEvent.fallInHole, this.fallInHole);
+    off(GameEvent.batteryChange, this.batteryChange);
   }
 
-  startDieRoutine() {
-    if (this.state === 'dead') return;
-    this.state = 'dead';
-    this.spineObject.animationState.setAnimation(0, 'dead', false);
-    playPlayerDie();
-    this.destroyPhysicsObjects();
-    const animationStateListeners = {
-      complete: (trackEntry) => {
-        this.spineObject.animationState.removeListener(animationStateListeners);
-        this.destroy();
-      },
-    };
-
-    this.spineObject.animationState.addListener(animationStateListeners);
-  }
   get x() {
     if (this.state === 'dead') return this.deadPos.x;
     return this.ball.position.x;
@@ -274,8 +221,5 @@ export class Player {
   get y() {
     if (this.state === 'dead') return this.deadPos.y;
     return this.ball.position.y;
-  }
-  get eyeGroup(): Bone {
-    return this.spineObject.skeleton.findBone('eye-group');
   }
 }
