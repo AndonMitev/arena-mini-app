@@ -21,7 +21,7 @@ const MAX_FORCE_DIFF = 300;
 
 export class Player {
   sprite: Phaser.GameObjects.Sprite;
-  hole: Phaser.GameObjects.Sprite;
+  mask: Phaser.GameObjects.Graphics;
   ball: MatterJS.BodyType;
   trailRope: Phaser.GameObjects.Rope;
   startPoint: Phaser.Math.Vector2;
@@ -51,10 +51,19 @@ export class Player {
   }
 
   initSprite() {
+    // Create a circular mask
+    this.mask = this.scene.make.graphics({});
+    this.mask.fillStyle(0xffffff);
+    this.mask.fillCircle(BALL_RADIUS, BALL_RADIUS, BALL_RADIUS);
+
+    // Create the sprite and apply the mask
     this.sprite = this.scene.add
       .sprite(this.startPoint.x, this.startPoint.y, 'playerPfp')
       .setDisplaySize(BALL_RADIUS * 2, BALL_RADIUS * 2)
       .setDepth(DepthGroup.player);
+
+    this.sprite.setMask(this.mask.createGeometryMask());
+
     this.scene.cameras.main.startFollow(this.sprite, true, 0, 0.2);
   }
 
@@ -131,6 +140,8 @@ export class Player {
     if (this.state === 'dead') return;
     this.sprite.setPosition(this.ball.position.x, this.ball.position.y);
     this.sprite.setDepth(DepthGroup.player + 1 / Math.abs(this.ball.position.y - 3000));
+    // Update mask position
+    this.mask.setPosition(this.ball.position.x - BALL_RADIUS, this.ball.position.y - BALL_RADIUS);
     if (this.shotsTxtContainer) {
       this.shotsTxtContainer.x = this.ball.position.x + TEXT_OFFSET.x;
       this.shotsTxtContainer.y = this.ball.position.y + TEXT_OFFSET.y;
@@ -195,6 +206,8 @@ export class Player {
     this.removeEventListeners();
     this.sprite.destroy();
     this.sprite = null;
+    this.mask.destroy();
+    this.mask = null;
     this.shotsTxt.destroy();
     this.shotsTxt = null;
     this.shotsTxtContainer.destroy();
