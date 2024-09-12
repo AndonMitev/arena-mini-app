@@ -16,7 +16,6 @@ import { Level } from '~/scenes/Level';
 import { GameOver } from '~/scenes/GameOver';
 import { HUD } from '~/scenes/HUD';
 import { MyColor } from '~/enums/MyColor';
-import { socketService } from './services/socketService';
 import { Preloader } from '~/scenes/Preloader';
 
 const addScenes = (game: Game) => {
@@ -32,31 +31,9 @@ const addScenes = (game: Game) => {
 
 export class MyGame {
   game: Game;
-  private sessionId: string | null = null;
 
   constructor() {
     this.initGame();
-    this.initializeSocket();
-  }
-
-  private initializeSocket() {
-    console.log('Attempting to connect to socket');
-    socketService.connect();
-
-    socketService.on('connect', () => {
-      console.log('Socket connected successfully');
-    });
-
-    socketService.on('sessionCreated', ({ sessionId }) => {
-      this.sessionId = sessionId;
-      console.log(`Session created for game: ${sessionId}`);
-      this.game.events.emit('sessionCreated', { sessionId });
-    });
-
-    socketService.on('userData', ({ fid, data }) => {
-      console.log(`Received user data in MyGame for FID ${fid}:`, data);
-      this.game.events.emit('userData', { fid, data });
-    });
   }
 
   async initGame() {
